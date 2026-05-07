@@ -1,28 +1,27 @@
-# Building security-first AI products
+<div align="center">
 
-I build practical AI systems that turn messy, high-volume digital workflows into safer, cleaner, more valuable products.
+# Jeremy Cooper
 
-Current focus: **SiftMail** — an AI-powered inbox shield and triage layer for email security, prioritization, classification, and automation.
+Solo founder of **[SiftMail](https://siftmail.app)** — AI-powered email security and inbox organization for individuals and small teams.
 
-## What I work on
+</div>
 
-- AI-assisted email security and inbox triage
-- SaaS product architecture
-- Gmail / OAuth / Stripe / backend workflow automation
-- Security reviews, privacy-aware systems, and abuse prevention
-- Revenue-focused product experiments and launch systems
+<br />
 
-## Public showcases
+#### Currently
 
-### SiftMail Architecture
-A public overview of the architecture, product strategy, and security posture behind an AI-powered inbox shield.
+**[siftmail.app](https://siftmail.app)** · Security-first inbox organization. Sift classifies every email, surfaces what matters, hides what doesn't, scores the rest. Founding members from $5/mo.
 
-## Private commercial work
+**[substance](https://default245.github.io/substance/)** · An interactive periodic table read through five overlays — price, rarity, toxicity, supply, and value & peril. A side study in data density.
 
-The main SiftMail codebase is private because it contains commercial product logic, security-sensitive implementation details, deployment configuration, and active product development.
+#### Stack
 
-Public repos here are intentionally sanitized to show product depth without exposing proprietary code or secrets.
+Next.js · Fastify · BullMQ · Postgres · Redis · Prisma · Stripe · Anthropic Sonnet & Haiku
 
-## Current stack
+#### Reach
 
-Next.js, TypeScript, Node, Prisma, PostgreSQL, Stripe, Gmail OAuth, background workers, AI classification, CI/CD, Railway, Netlify.
+[siftmail.app](https://siftmail.app) · [linkedin/helpmesift](https://linkedin.com/in/helpmesift) · jeremy@siftmail.app
+
+<br />
+
+<sub>San Francisco</sub>
