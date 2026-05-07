@@ -14,7 +14,7 @@ Current focus: **SiftMail** — an AI-powered inbox shield and triage layer for 
 
 ## Public showcases
 
-### SiftMail Showcase
+### SiftMail Architecture
 A public overview of the architecture, product strategy, and security posture behind an AI-powered inbox shield.
 
 ## Private commercial work
