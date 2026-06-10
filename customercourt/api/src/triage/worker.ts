@@ -1,15 +1,13 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
-import { connection, QUEUES, type TriageJob } from "../queues.js";
+import { connection, outreachQueue, QUEUES, type TriageJob } from "../queues.js";
+import { structuredCall } from "../lib/claude.js";
 import { TRIAGE_SCHEMA, type TriageResult } from "./schema.js";
 
 const prisma = new PrismaClient();
-const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
-// Stable system prompt — cached across requests via cache_control below.
-// Keep this byte-identical between calls; volatile case content goes in the
-// user turn after the cache breakpoint.
+// Stable system prompt — cached across requests by structuredCall. Keep it
+// byte-identical between calls; volatile case content goes in the user turn.
 const TRIAGE_SYSTEM = `You are the intake triage engine for a consumer-complaint
 resolution platform. Consumers describe problems with companies in their own
 words; your job is to turn each complaint into a structured case.
@@ -29,28 +27,11 @@ export const triageWorker = new Worker<TriageJob>(
     const { caseId } = job.data;
     const kase = await prisma.case.findUniqueOrThrow({ where: { id: caseId } });
 
-    const response = await anthropic.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 2048,
-      thinking: { type: "adaptive" },
-      system: [
-        {
-          type: "text",
-          text: TRIAGE_SYSTEM,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{ role: "user", content: kase.rawComplaint }],
-      output_config: {
-        format: { type: "json_schema", schema: TRIAGE_SCHEMA },
-      },
+    const triage = await structuredCall<TriageResult>({
+      system: TRIAGE_SYSTEM,
+      user: kase.rawComplaint,
+      schema: TRIAGE_SCHEMA,
     });
-
-    const text = response.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") {
-      throw new Error(`triage: no text block in response for case ${caseId}`);
-    }
-    const triage: TriageResult = JSON.parse(text.text);
 
     // Resolve or create the company record so routing has something to work with.
     let companyId: string | null = null;
@@ -85,6 +66,15 @@ export const triageWorker = new Worker<TriageJob>(
       }),
     ]);
 
+    // Safety-flagged cases stop here (human queue). Everything else moves
+    // straight to drafting the first contact, which waits on consumer approval.
+    if (!triage.safety_flag) {
+      await outreachQueue.add("first_contact", {
+        caseId,
+        kind: "first_contact",
+      });
+    }
+
     return triage;
   },
   { connection },
@@ -93,5 +83,3 @@ export const triageWorker = new Worker<TriageJob>(
 triageWorker.on("failed", (job, err) => {
   console.error(`triage failed for case ${job?.data.caseId}:`, err.message);
 });
-
-console.log("triage worker listening");

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "worker": "tsx src/triage/worker.ts",
+    "worker": "tsx src/worker.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",

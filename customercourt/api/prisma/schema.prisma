@@ -61,6 +61,7 @@ model Case {
   desiredOutcome String? // set by triage
   valueCents     Int? // estimated dollar value at stake
   safetyFlag     Boolean    @default(false)
+  followupCount  Int        @default(0)
   slaDeadline    DateTime?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -99,6 +100,7 @@ model Message {
   caseId    String
   case      Case             @relation(fields: [caseId], references: [id])
   direction MessageDirection
+  status    MessageStatus    @default(SENT)
   channel   String           @default("email")
   subject   String?
   body      String
@@ -111,6 +113,14 @@ enum MessageDirection {
   CONSUMER // consumer → platform
   PLATFORM // platform → company (on consumer's behalf)
   COMPANY // company → platform
+}
+
+// PLATFORM messages are created as DRAFT. First contact requires consumer
+// approval before sending; follow-ups auto-send under the per-case
+// authorization recorded at approval time.
+enum MessageStatus {
+  DRAFT
+  SENT
 }
 
 model Resolution {
