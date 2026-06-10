@@ -1,4 +1,4 @@
-# Resolution Platform
+# CustomService (CS)
 
 **A universal contact point between consumers and companies — every complaint gets driven to a resolution.**
 
