@@ -1,4 +1,4 @@
-# CustomService (CS)
+# CustomerCourt
 
 **A universal contact point between consumers and companies — every complaint gets driven to a resolution.**
 
