@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Consumer {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  cases     Case[]
+}
+
+model Company {
+  id            String         @id @default(cuid())
+  name          String
+  domain        String?        @unique
+  createdAt     DateTime       @default(now())
+  contactPoints ContactPoint[]
+  cases         Case[]
+}
+
+// A way to reach a company, with learned performance stats per contact.
+model ContactPoint {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  kind            ContactKind
+  address         String // email address, URL, phone
+  tier            Int      @default(0) // 0 = front-line support, higher = escalation
+  resolutionRate  Float? // learned; null until enough outcomes
+  medianReplyHrs  Float?
+  createdAt       DateTime @default(now())
+
+  @@unique([companyId, address])
+}
+
+enum ContactKind {
+  SUPPORT_EMAIL
+  ESCALATION_EMAIL
+  EXECUTIVE_RELATIONS
+  WEB_FORM
+  REGULATOR
+}
+
+model Case {
+  id             String     @id @default(cuid())
+  consumerId     String
+  consumer       Consumer   @relation(fields: [consumerId], references: [id])
+  companyId      String?
+  company        Company?   @relation(fields: [companyId], references: [id])
+  status         CaseStatus @default(INTAKE)
+  rawComplaint   String // consumer's own words, verbatim
+  category       String? // set by triage
+  severity       String? // set by triage
+  summary        String? // set by triage
+  desiredOutcome String? // set by triage
+  valueCents     Int? // estimated dollar value at stake
+  safetyFlag     Boolean    @default(false)
+  slaDeadline    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  events         CaseEvent[]
+  messages       Message[]
+  resolution     Resolution?
+
+  @@index([status, slaDeadline])
+}
+
+enum CaseStatus {
+  INTAKE
+  TRIAGED
+  SENT
+  AWAITING_COMPANY
+  NEGOTIATING
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+// Append-only timeline. This is the case history consumers see.
+model CaseEvent {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  type      String // e.g. "case.created", "triage.completed", "outreach.sent"
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model Message {
+  id        String           @id @default(cuid())
+  caseId    String
+  case      Case             @relation(fields: [caseId], references: [id])
+  direction MessageDirection
+  channel   String           @default("email")
+  subject   String?
+  body      String
+  createdAt DateTime         @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+enum MessageDirection {
+  CONSUMER // consumer → platform
+  PLATFORM // platform → company (on consumer's behalf)
+  COMPANY // company → platform
+}
+
+model Resolution {
+  id                String   @id @default(cuid())
+  caseId            String   @unique
+  case              Case     @relation(fields: [caseId], references: [id])
+  outcome           Outcome
+  valueCents        Int?
+  consumerSatisfied Boolean?
+  resolvedAt        DateTime @default(now())
+}
+
+enum Outcome {
+  REFUND
+  REPLACEMENT
+  CREDIT
+  APOLOGY
+  POLICY_EXCEPTION
+  PARTIAL
+  HANDED_OFF // chargeback / regulator / small-claims package delivered
+  UNRESOLVED
+}
