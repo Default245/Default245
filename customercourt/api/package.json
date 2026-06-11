@@ -8,6 +8,7 @@
     "worker": "tsx src/worker.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "eval": "tsx evals/run.ts",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"
   },

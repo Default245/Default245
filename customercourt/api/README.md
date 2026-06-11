@@ -68,8 +68,12 @@ If the company never replies: the SLA sweep (every 5 min; `SLA_SWEEP_MS` to chan
 | `src/server.ts` + `src/routes/cases.ts` | HTTP API (no queue consumers in this process) |
 | `src/worker.ts` | Entrypoint for all queue workers + SLA scheduler |
 | `src/triage/` | Complaint → structured case (category, severity, company, ask) |
-| `src/outreach/` | Drafts first contact (approval-gated) and follow-ups; routing v0 |
+| `src/outreach/` | Drafts first contact (approval-gated) and follow-ups; ladder routing |
 | `src/replies/` | Company reply → offer/refusal/stall/info_request → state machine |
+| `src/negotiation/` | Counters lowball offers and refusals; drafts behind the approval gate |
+| `src/escalation/` | Climbs the contact ladder; consumer handoff package when it's exhausted |
 | `src/sla/` | Repeatable sweep: overdue cases get follow-ups, then escalate |
+| `src/graph/` | Resolved cases → contact-point resolution rates and reply latency |
 | `src/lib/claude.ts` | One structured-output call shape for every pipeline stage |
 | `src/lib/mailer.ts` | Outbound email stub (swap for SES/Postmark/Resend) |
+| `evals/` | Golden sets + regression gate: `npm run eval` (~32 calls; fails on category/reply_type accuracy < 0.85 or any safety_flag miss) |
