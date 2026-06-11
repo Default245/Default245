@@ -8,11 +8,13 @@ datasource db {
 }
 
 model Consumer {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  cases     Case[]
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String?
+  stripeCustomerId String?  @unique // Stripe Customer backing bank linking
+  fcAccountId      String? // Stripe Financial Connections account (fca_...)
+  createdAt        DateTime @default(now())
+  cases            Case[]
 }
 
 model Company {

@@ -2,13 +2,18 @@
 // credit) actually landed in the consumer's account, so resolutions are
 // confirmed against transactions instead of taking anyone's word for it.
 //
-// Lossless is the intended provider. Its API is not publicly documented, so
-// LosslessBankProvider is a skeleton: auth and config are wired (key from
-// LOSSLESS_API_KEY env — never in the repo), the request shape is TODO until
-// we have the docs. The stub provider keeps the pipeline runnable meanwhile.
+// Provider: Stripe Financial Connections. Consumers link their bank through
+// the Stripe-hosted flow (see src/routes/bank.ts); verification then searches
+// posted transactions on the linked account for a credit matching the
+// promised amount.
+
+import type Stripe from "stripe";
+import { maybeStripe } from "./stripe.js";
 
 export interface DepositQuery {
-  consumerEmail: string;
+  // Provider-specific linked-account reference (Stripe: fca_...). Null when
+  // the consumer hasn't linked a bank account.
+  accountRef: string | null;
   amountCents: number;
   since: Date;
 }
@@ -23,7 +28,7 @@ export interface BankProvider {
   findDeposit(query: DepositQuery): Promise<DepositResult>;
 }
 
-// Default until Lossless is configured: reports "not found" so resolutions
+// Default when Stripe isn't configured: reports "not found" so resolutions
 // stay unverified rather than falsely verified.
 export class StubBankProvider implements BankProvider {
   readonly name = "stub";
@@ -33,25 +38,42 @@ export class StubBankProvider implements BankProvider {
   }
 }
 
-export class LosslessBankProvider implements BankProvider {
-  readonly name = "lossless";
+// How many transactions to scan before giving up. Refunds land within weeks
+// of a case opening; a deposit older than the scan window is out of scope.
+const MAX_SCANNED_TRANSACTIONS = 500;
 
-  constructor(private readonly apiKey: string) {}
+export class StripeBankProvider implements BankProvider {
+  readonly name = "stripe";
 
-  async findDeposit(_query: DepositQuery): Promise<DepositResult> {
-    // TODO(lossless-docs): implement against the Lossless API once we have
-    // its documentation (base URL, endpoint, auth header, response shape).
-    // Until then this provider must not be selected silently.
-    throw new Error(
-      "LosslessBankProvider: API integration not implemented — awaiting API docs",
-    );
+  constructor(private readonly stripe: Stripe) {}
+
+  async findDeposit(query: DepositQuery): Promise<DepositResult> {
+    if (!query.accountRef) return { found: false, transactionRef: null };
+
+    const sinceEpoch = Math.floor(query.since.getTime() / 1000);
+    let scanned = 0;
+
+    // Financial Connections transactions: amount is in minor units, credits
+    // to the account are positive. We want a posted credit for the promised
+    // amount, transacted after the case opened.
+    for await (const tx of this.stripe.financialConnections.transactions.list({
+      account: query.accountRef,
+      limit: 100,
+    })) {
+      if (++scanned > MAX_SCANNED_TRANSACTIONS) break;
+      if (
+        tx.status === "posted" &&
+        tx.amount === query.amountCents &&
+        tx.transacted_at >= sinceEpoch
+      ) {
+        return { found: true, transactionRef: tx.id };
+      }
+    }
+    return { found: false, transactionRef: null };
   }
 }
 
 export function bankProvider(): BankProvider {
-  const key = process.env.LOSSLESS_API_KEY;
-  if (key && process.env.LOSSLESS_ENABLED === "true") {
-    return new LosslessBankProvider(key);
-  }
-  return new StubBankProvider();
+  const stripe = maybeStripe();
+  return stripe ? new StripeBankProvider(stripe) : new StubBankProvider();
 }

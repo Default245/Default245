@@ -29,9 +29,20 @@ export const verificationWorker = new Worker<VerificationJob>(
       return { verified: false, reason: "nothing_to_verify" };
     }
 
+    if (!kase.consumer.fcAccountId) {
+      await prisma.caseEvent.create({
+        data: {
+          caseId,
+          type: "resolution.unverified",
+          payload: { reason: "bank_not_linked" },
+        },
+      });
+      return { verified: false, reason: "bank_not_linked" };
+    }
+
     const provider = bankProvider();
     const result = await provider.findDeposit({
-      consumerEmail: kase.consumer.email,
+      accountRef: kase.consumer.fcAccountId,
       amountCents: resolution.valueCents,
       since: kase.createdAt,
     });
@@ -65,6 +76,7 @@ export const verificationWorker = new Worker<VerificationJob>(
         caseId,
         type: "resolution.unverified",
         payload: {
+          reason: "deposit_not_found",
           provider: provider.name,
           amountCents: resolution.valueCents,
         },
