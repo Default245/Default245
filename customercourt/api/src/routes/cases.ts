@@ -5,6 +5,7 @@ import {
   replyQueue,
   SLA_HOURS,
   triageQueue,
+  verificationQueue,
 } from "../queues.js";
 import { sendEmail } from "../lib/mailer.js";
 import { contactAddress } from "../outreach/routing.js";
@@ -259,8 +260,10 @@ export async function caseRoutes(app: FastifyInstance) {
           }),
         ]);
 
-        // Feed the learning loop: contact-point stats, outcome labels.
+        // Feed the learning loop and verify monetary outcomes against the
+        // consumer's bank account (no-op until a provider is configured).
         await outcomesQueue.add("update", { caseId: kase.id });
+        await verificationQueue.add("verify", { caseId: kase.id });
 
         return reply.code(201).send(resolution);
       },

@@ -13,6 +13,7 @@ export const QUEUES = {
   negotiation: "negotiation",
   escalation: "escalation",
   outcomes: "outcomes",
+  verification: "verification",
 } as const;
 
 // Case-loop policy knobs. Env-overridable so ops can tune without a deploy.
@@ -55,6 +56,10 @@ export interface OutcomeJob {
   caseId: string;
 }
 
+export interface VerificationJob {
+  caseId: string;
+}
+
 export const triageQueue = new Queue<TriageJob>(QUEUES.triage, { connection });
 export const outreachQueue = new Queue<OutreachJob>(QUEUES.outreach, {
   connection,
@@ -70,3 +75,7 @@ export const escalationQueue = new Queue<EscalationJob>(QUEUES.escalation, {
 export const outcomesQueue = new Queue<OutcomeJob>(QUEUES.outcomes, {
   connection,
 });
+export const verificationQueue = new Queue<VerificationJob>(
+  QUEUES.verification,
+  { connection },
+);
