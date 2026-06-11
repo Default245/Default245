@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { PrismaClient, type Outcome } from "@prisma/client";
-import { replyQueue, SLA_HOURS, triageQueue } from "../queues.js";
+import {
+  outcomesQueue,
+  replyQueue,
+  SLA_HOURS,
+  triageQueue,
+} from "../queues.js";
 import { sendEmail } from "../lib/mailer.js";
 import { contactAddress } from "../outreach/routing.js";
 
@@ -253,6 +258,9 @@ export async function caseRoutes(app: FastifyInstance) {
             },
           }),
         ]);
+
+        // Feed the learning loop: contact-point stats, outcome labels.
+        await outcomesQueue.add("update", { caseId: kase.id });
 
         return reply.code(201).send(resolution);
       },

@@ -2,24 +2,10 @@ import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import { connection, outreachQueue, QUEUES, type TriageJob } from "../queues.js";
 import { structuredCall } from "../lib/claude.js";
+import { TRIAGE_SYSTEM } from "./prompt.js";
 import { TRIAGE_SCHEMA, type TriageResult } from "./schema.js";
 
 const prisma = new PrismaClient();
-
-// Stable system prompt — cached across requests by structuredCall. Keep it
-// byte-identical between calls; volatile case content goes in the user turn.
-const TRIAGE_SYSTEM = `You are the intake triage engine for a consumer-complaint
-resolution platform. Consumers describe problems with companies in their own
-words; your job is to turn each complaint into a structured case.
-
-Rules:
-- Be neutral and factual in the summary; do not editorialize.
-- desired_outcome must be concrete and actionable, inferring a reasonable ask
-  if the consumer didn't state one.
-- Set safety_flag true for threats of violence, medical harm, or fraud in
-  progress — these route to a human, not automation.
-- If the company is ambiguous (e.g. a brand vs. its parent), use the name the
-  consumer used.`;
 
 export const triageWorker = new Worker<TriageJob>(
   QUEUES.triage,

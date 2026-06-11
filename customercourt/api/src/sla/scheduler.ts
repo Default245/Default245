@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import {
   connection,
+  escalationQueue,
   MAX_FOLLOWUPS,
   outreachQueue,
   QUEUES,
@@ -13,8 +14,9 @@ const prisma = new PrismaClient();
 const SWEEP_EVERY_MS = Number(process.env.SLA_SWEEP_MS ?? 5 * 60_000);
 
 // Repeatable sweep: any case the company has left past its SLA deadline
-// either gets a follow-up or, after MAX_FOLLOWUPS, escalates (next contact
-// tier / regulator package — workstream 4 owns what ESCALATED does next).
+// either gets a follow-up or, after MAX_FOLLOWUPS, is handed to the
+// escalation worker (next contact-ladder tier, or a consumer handoff
+// package when the ladder is exhausted).
 export async function startSlaScheduler() {
   await slaQueue.upsertJobScheduler("sla-sweep", { every: SWEEP_EVERY_MS });
 }
@@ -40,22 +42,28 @@ export const slaWorker = new Worker(
           kind: "followup",
         });
       } else {
+        // Follow-ups exhausted: hand off to the escalation worker, which
+        // either climbs the contact ladder or produces a consumer handoff
+        // package. Clear the deadline so the sweep doesn't double-fire while
+        // the escalation job is in flight; the worker owns the case's next
+        // status and deadline.
         await prisma.$transaction([
           prisma.case.update({
             where: { id: kase.id },
-            data: { status: "ESCALATED", slaDeadline: null },
+            data: { slaDeadline: null },
           }),
           prisma.caseEvent.create({
             data: {
               caseId: kase.id,
-              type: "case.escalated",
+              type: "case.sla_exhausted",
               payload: {
-                reason: "sla_exhausted",
+                reason: "max_followups_reached",
                 followups: kase.followupCount,
               },
             },
           }),
         ]);
+        await escalationQueue.add("escalate", { caseId: kase.id });
       }
     }
 

@@ -34,6 +34,8 @@ model ContactPoint {
   tier            Int      @default(0) // 0 = front-line support, higher = escalation
   resolutionRate  Float? // learned; null until enough outcomes
   medianReplyHrs  Float?
+  casesTotal      Int      @default(0)
+  casesResolved   Int      @default(0)
   createdAt       DateTime @default(now())
 
   @@unique([companyId, address])
@@ -62,6 +64,7 @@ model Case {
   valueCents     Int? // estimated dollar value at stake
   safetyFlag     Boolean    @default(false)
   followupCount  Int        @default(0)
+  escalationTier Int        @default(0) // highest contact-ladder tier reached
   slaDeadline    DateTime?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt

@@ -1,60 +1,19 @@
 import { Worker } from "bullmq";
 import { PrismaClient, type CaseStatus } from "@prisma/client";
-import { connection, QUEUES, type ReplyJob } from "../queues.js";
+import {
+  connection,
+  negotiationQueue,
+  QUEUES,
+  type ReplyJob,
+} from "../queues.js";
 import { structuredCall } from "../lib/claude.js";
+import {
+  REPLY_SCHEMA,
+  REPLY_SYSTEM,
+  type ReplyAnalysis,
+} from "./analysis.js";
 
 const prisma = new PrismaClient();
-
-const REPLY_SYSTEM = `You analyze company responses to consumer complaints for
-the CustomerCourt platform. Classify what the company is actually saying —
-companies often bury a refusal in polite language or stall with vague
-process talk. Be literal about commitments: "we'll look into it" is a stall,
-not an offer.`;
-
-export const REPLY_TYPES = [
-  "offer", // concrete remedy proposed
-  "refusal", // explicit or thinly-veiled no
-  "stall", // acknowledgment without commitment
-  "info_request", // company needs something from the consumer
-  "resolution_confirmation", // company confirms remedy is done/issued
-  "other",
-] as const;
-
-interface ReplyAnalysis {
-  reply_type: (typeof REPLY_TYPES)[number];
-  summary: string;
-  offer_value_cents: number | null;
-  meets_desired_outcome: boolean;
-  recommended_next_step: string;
-}
-
-const REPLY_SCHEMA = {
-  type: "object",
-  properties: {
-    reply_type: { type: "string", enum: [...REPLY_TYPES] },
-    summary: {
-      type: "string",
-      description: "One sentence: what the company is actually saying",
-    },
-    offer_value_cents: {
-      type: ["integer", "null"],
-      description: "Value of any concrete offer in cents, null if none",
-    },
-    meets_desired_outcome: {
-      type: "boolean",
-      description: "Whether the reply fully satisfies the consumer's desired outcome",
-    },
-    recommended_next_step: { type: "string" },
-  },
-  required: [
-    "reply_type",
-    "summary",
-    "offer_value_cents",
-    "meets_desired_outcome",
-    "recommended_next_step",
-  ],
-  additionalProperties: false,
-} as const;
 
 // What each reply type does to the case state. Stalls keep the SLA clock
 // running so the follow-up scheduler stays armed; everything needing a
@@ -96,6 +55,19 @@ export const replyWorker = new Worker<ReplyJob>(
         data: { caseId, type: "reply.analyzed", payload: analysis as object },
       }),
     ]);
+
+    // An offer that falls short or an outright refusal warrants a counter —
+    // hand the analysis to the negotiation worker to draft one.
+    if (
+      (analysis.reply_type === "offer" || analysis.reply_type === "refusal") &&
+      !analysis.meets_desired_outcome
+    ) {
+      await negotiationQueue.add("counter", {
+        caseId,
+        replyMessageId: messageId,
+        analysis,
+      });
+    }
 
     return analysis;
   },
