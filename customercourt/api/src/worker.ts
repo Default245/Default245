@@ -3,17 +3,25 @@
 import { triageWorker } from "./triage/worker.js";
 import { outreachWorker } from "./outreach/worker.js";
 import { replyWorker } from "./replies/worker.js";
+import { negotiationWorker } from "./negotiation/worker.js";
+import { escalationWorker } from "./escalation/worker.js";
+import { graphWorker } from "./graph/worker.js";
 import { slaWorker, startSlaScheduler } from "./sla/scheduler.js";
 
 await startSlaScheduler();
 
-console.log("workers up: triage, outreach, replies, sla");
+console.log(
+  "workers up: triage, outreach, replies, negotiation, escalation, graph, sla",
+);
 
 async function shutdown() {
   await Promise.all([
     triageWorker.close(),
     outreachWorker.close(),
     replyWorker.close(),
+    negotiationWorker.close(),
+    escalationWorker.close(),
+    graphWorker.close(),
     slaWorker.close(),
   ]);
   process.exit(0);
