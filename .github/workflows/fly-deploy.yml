@@ -1,0 +1,27 @@
+name: Deploy to Fly
+
+on:
+  push:
+    branches:
+      - main
+      - claude/customer-service-resolution-platform-kwjf5k
+    paths:
+      - "customercourt/**"
+      - ".github/workflows/fly-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        working-directory: customercourt/api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
