@@ -61,6 +61,25 @@ curl -s -X POST localhost:3001/v1/cases/<caseId>/resolve \
 
 If the company never replies: the SLA sweep (every 5 min; `SLA_SWEEP_MS` to change) sends up to `MAX_FOLLOWUPS` (default 2) increasingly firm follow-ups `SLA_HOURS` (default 72h) apart, then marks the case `ESCALATED`.
 
+## Deploy (Fly.io)
+
+The app deploys to the existing Fly apps (`customercourt`, `customercourt-db`, `customercourt-redis`, region ams). From this directory:
+
+```bash
+# One-time: secrets
+fly postgres attach customercourt-db -a customercourt   # sets DATABASE_URL
+fly secrets set -a customercourt \
+  REDIS_URL='rediss://...' \          # from customercourt-redis (Upstash)
+  ANTHROPIC_API_KEY='sk-ant-...' \
+  STRIPE_SECRET_KEY='sk_live_or_test_...'
+
+# Every deploy: builds the Dockerfile, runs prisma migrate deploy as the
+# release command, then rolls api + worker processes
+fly deploy
+```
+
+`fly.toml` defines two process groups: `api` (HTTP, health-checked on `/healthz`, can auto-stop) and `worker` (queues + SLA scheduler — pinned on, because a sleeping worker means follow-ups silently stop). Scale with `fly scale count api=2 worker=2`.
+
 ## Layout
 
 | Path | What it does |

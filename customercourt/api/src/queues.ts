@@ -1,9 +1,27 @@
 import { Queue } from "bullmq";
+import type { ConnectionOptions } from "bullmq";
 
-export const connection = {
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: Number(process.env.REDIS_PORT ?? 6379),
-};
+// Prefer REDIS_URL (managed Redis like Upstash on Fly hands out a single
+// rediss:// URL); fall back to host/port for local docker-compose.
+function redisConnection(): ConnectionOptions {
+  const url = process.env.REDIS_URL;
+  if (url) {
+    const u = new URL(url);
+    return {
+      host: u.hostname,
+      port: Number(u.port || 6379),
+      username: u.username || undefined,
+      password: u.password || undefined,
+      ...(u.protocol === "rediss:" ? { tls: {} } : {}),
+    };
+  }
+  return {
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: Number(process.env.REDIS_PORT ?? 6379),
+  };
+}
+
+export const connection = redisConnection();
 
 export const QUEUES = {
   triage: "triage",
